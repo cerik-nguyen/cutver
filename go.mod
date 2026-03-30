@@ -1,4 +1,4 @@
-module github.com/roryq/cutver
+module github.com/cerik-nguyen/cutver
 
 go 1.16
 
