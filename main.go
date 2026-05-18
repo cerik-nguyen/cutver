@@ -19,6 +19,8 @@ import (
 func main() {
 	latest := flag.Bool("latest", false, "pre-fill tag with the latest reachable tag from current commit")
 	flag.BoolVar(latest, "l", false, "pre-fill tag with the latest reachable tag from current commit (shorthand)")
+	copyTag := flag.Bool("copy", false, "copy the tag to clipboard after tagging")
+	flag.BoolVar(copyTag, "c", false, "copy the tag to clipboard after tagging (shorthand)")
 	flag.Parse()
 
 	repo, err := getRepoInfo()
@@ -38,7 +40,7 @@ func main() {
 	}
 
 	resultCommandChan := make(chan string, 1)
-	if err := tea.NewProgram(initialModel(repo.currentBranch, initialTag, resultCommandChan)).Start(); err != nil {
+	if err := tea.NewProgram(initialModel(repo.currentBranch, initialTag, *copyTag, resultCommandChan)).Start(); err != nil {
 		fmt.Printf("could not start program: %s\n", err)
 		os.Exit(1)
 	}
@@ -78,12 +80,14 @@ type model struct {
 	inputs            []textinput.Model
 	cursorMode        textinput.CursorMode
 	tagCommandOutChan chan string
+	copyTag           bool
 }
 
-func initialModel(branch string, initialTag string, tagCommand chan string) model {
+func initialModel(branch string, initialTag string, copyTag bool, tagCommand chan string) model {
 	m := model{
 		inputs:            make([]textinput.Model, 2),
 		tagCommandOutChan: tagCommand,
+		copyTag:           copyTag,
 	}
 
 	var t textinput.Model
@@ -184,7 +188,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) updateInputs(msg tea.Msg) tea.Cmd {
-	var cmds = make([]tea.Cmd, len(m.inputs))
+	cmds := make([]tea.Cmd, len(m.inputs))
 
 	// Only text inputs with Focus() set will respond, so it's safe to simply
 	// update all of them here without any further logic.
@@ -221,6 +225,9 @@ func (m model) command() []string {
 	command := []string{
 		`git tag -a `, tag, ` -m "source=manual,branch=`, branch, `,tag=`, tag,
 		`" && git push origin `, tag,
+	}
+	if m.copyTag {
+		command = append(command, ` && echo -n `, tag, ` | pbcopy`)
 	}
 	return command
 }
